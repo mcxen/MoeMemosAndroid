@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.api.MemosV0User
 import me.mudkip.moememos.data.api.MemosV1User
+import me.mudkip.moememos.data.api.resolveCurrentUser
 import me.mudkip.moememos.data.constant.MoeMemosException
 import me.mudkip.moememos.data.model.Account
 import me.mudkip.moememos.data.model.LocalAccount
@@ -134,15 +135,12 @@ class UserStateViewModel @Inject constructor(
         accountLabel: String,
     ): ApiResponse<Unit> = withContext(viewModelScope.coroutineContext) {
         try {
-            val resp = accountService.createMemosV1Client(host, accessToken).second.getCurrentUser()
+            val api = accountService.createMemosV1Client(host, accessToken).second
+            val resp = api.resolveCurrentUser(accessToken)
             if (resp !is ApiResponse.Success) {
                 return@withContext resp.mapSuccess {}
             }
-            val user = resp.data.user
-            if (user == null) {
-                return@withContext ApiResponse.exception(MoeMemosException.notLogin)
-            }
-            accountService.addAccount(getAccount(host, accessToken, accountLabel, user))
+            accountService.addAccount(getAccount(host, accessToken, accountLabel, resp.data))
             loadCurrentUser().mapSuccess {}
         } catch (e: Throwable) {
             ApiResponse.exception(e)
@@ -191,7 +189,7 @@ class UserStateViewModel @Inject constructor(
         info = MemosAccount(
             host = host,
             accessToken = accessToken,
-            name = user.username,
+            name = user.resolvedDisplayName(),
             avatarUrl = user.avatarUrl ?: "",
             startDateEpochSecond = user.createTime?.epochSecond ?: 0L,
             accountLabel = accountLabel.trim(),

@@ -90,10 +90,7 @@ fun LoginPage(
 
     var loginCompatibilityWarning by remember { mutableStateOf<String?>(null) }
 
-    fun normalizedHost(): String {
-        val trimmed = host.text.trim()
-        return if (trimmed.contains("//")) trimmed else "https://$trimmed"
-    }
+    fun normalizedHost(): String = normalizeMemosHost(host.text)
 
     fun login(allowHigherV1Version: Boolean = false) = coroutineScope.launch {
         if (host.text.isBlank() || accessToken.text.isBlank()) {
@@ -275,6 +272,12 @@ fun LoginPage(
                     label = {
                         Text(R.string.host.string)
                     },
+                    placeholder = {
+                        Text(R.string.host_placeholder.string)
+                    },
+                    supportingText = {
+                        Text(R.string.host_hint.string)
+                    },
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
                         autoCorrectEnabled = false,
@@ -318,4 +321,60 @@ fun LoginPage(
             }
         }
     }
+}
+
+/**
+ * Normalize a user-entered memos host so Retrofit can use it as baseUrl.
+ *
+ * - Explicit `http://` / `https://` is preserved (including bare IP servers).
+ * - Scheme-less local / IP / single-label hosts default to `http://`.
+ * - Other scheme-less hosts default to `https://`.
+ * - Ensures a trailing slash for Retrofit.
+ */
+internal fun normalizeMemosHost(raw: String): String {
+    var trimmed = raw.trim().trimEnd('/')
+    if (trimmed.isEmpty()) return trimmed
+
+    if (!trimmed.contains("://")) {
+        trimmed = if (isLocalOrIpHost(trimmed)) "http://$trimmed" else "https://$trimmed"
+    }
+
+    return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+}
+
+internal fun isLocalOrIpHost(hostPart: String): Boolean {
+    val authority = hostPart
+        .removePrefix("http://")
+        .removePrefix("https://")
+        .substringBefore('/')
+        .substringBefore('?')
+        .lowercase()
+
+    // Extract hostname: bracketed IPv6 keeps brackets; otherwise drop :port
+    val hostname = if (authority.startsWith("[")) {
+        val end = authority.indexOf(']')
+        if (end > 0) authority.substring(0, end + 1) else authority
+    } else {
+        authority.substringBefore(':')
+    }
+
+    if (hostname == "localhost" || hostname == "127.0.0.1" || hostname == "0.0.0.0" ||
+        hostname == "::1" || hostname == "[::1]"
+    ) {
+        return true
+    }
+
+    // Any IPv4 address (LAN or otherwise) — common for self-hosted memos
+    if (Regex("""^(\d{1,3}\.){3}\d{1,3}$""").matches(hostname)) return true
+
+    // Bracketed IPv6
+    if (hostname.startsWith("[") && hostname.endsWith("]")) return true
+
+    // .local mDNS names
+    if (hostname.endsWith(".local")) return true
+
+    // Single-label hostnames (e.g. "nas", "memos") are typically LAN / Docker names
+    if (!hostname.contains('.')) return true
+
+    return false
 }

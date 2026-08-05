@@ -14,6 +14,7 @@ import me.mudkip.moememos.data.api.MemosV1Resource
 import me.mudkip.moememos.data.api.MemosV1State
 import me.mudkip.moememos.data.api.MemosVisibility
 import me.mudkip.moememos.data.api.UpdateMemoRequest
+import me.mudkip.moememos.data.api.resolveCurrentUser
 import me.mudkip.moememos.data.constant.MoeMemosException
 import me.mudkip.moememos.data.model.Account
 import me.mudkip.moememos.data.model.Memo
@@ -30,6 +31,16 @@ class MemosV1Repository(
     private val account: Account.MemosV1
 ): RemoteRepository() {
     private val remoteUserIdentifier = account.info.remoteIdentifier
+
+    /**
+     * null = unknown; true = use parent=users/x (0.22–0.24); false = creator filter (≥0.27)
+     */
+    private var useParentListing: Boolean? = null
+
+    /**
+     * null = unknown; true = /api/v1/resources; false = /api/v1/attachments
+     */
+    private var useLegacyResources: Boolean? = null
 
     private fun convertResource(resource: MemosV1Resource): Resource {
         return Resource(
@@ -48,7 +59,7 @@ class MemosV1Repository(
             date = memo.createTime ?: Instant.now(),
             pinned = memo.pinned ?: false,
             visibility = memo.visibility?.toMemoVisibility() ?: MemoVisibility.PRIVATE,
-            resources = memo.attachments?.map { convertResource(it) } ?: emptyList(),
+            resources = memo.resourceList().map { convertResource(it) },
             tags = emptyList(),
             archived = memo.state == MemosV1State.ARCHIVED,
             updatedAt = memo.updateTime
@@ -72,6 +83,28 @@ class MemosV1Repository(
         return ApiResponse.Success(memos)
     }
 
+    private suspend fun listMemosByParent(state: MemosV1State, parent: String): ApiResponse<List<Memo>> {
+        var nextPageToken = ""
+        val memos = arrayListOf<Memo>()
+
+        do {
+            val resp = memosApi.listMemos(
+                pageSize = PAGE_SIZE,
+                pageToken = nextPageToken.ifEmpty { null },
+                state = state,
+                parent = parent,
+            )
+                .onSuccess { nextPageToken = data.nextPageToken.orEmpty() }
+                .mapSuccess { this.memos.map { convertMemo(it) } }
+            if (resp is ApiResponse.Success) {
+                memos.addAll(resp.data)
+            } else {
+                return resp
+            }
+        } while (nextPageToken.isNotEmpty())
+        return ApiResponse.Success(memos)
+    }
+
     private fun getId(identifier: String): String {
         return identifier.substringBefore('|').substringAfterLast('/')
     }
@@ -80,8 +113,30 @@ class MemosV1Repository(
         return identifier.substringBefore('|')
     }
 
+    private fun userParentName(): String {
+        val id = remoteUserIdentifier.trim()
+        return if (id.startsWith("users/")) id else "users/$id"
+    }
+
     private suspend fun listCurrentUserMemos(state: MemosV1State): ApiResponse<List<Memo>> {
-        return listMemosByFilter(state, "creator == \"$remoteUserIdentifier\"")
+        when (useParentListing) {
+            true -> return listMemosByParent(state, userParentName())
+            false -> return listMemosByFilter(state, "creator == \"$remoteUserIdentifier\"")
+            null -> {
+                // Probe ≥0.27 creator filter; 0.24 returns filter compile error.
+                val probe = memosApi.listMemos(
+                    pageSize = 1,
+                    state = state,
+                    filter = "creator == \"$remoteUserIdentifier\"",
+                )
+                if (probe is ApiResponse.Success) {
+                    useParentListing = false
+                    return listMemosByFilter(state, "creator == \"$remoteUserIdentifier\"")
+                }
+                useParentListing = true
+                return listMemosByParent(state, userParentName())
+            }
+        }
     }
 
     override suspend fun listMemos(): ApiResponse<List<Memo>> {
@@ -115,7 +170,7 @@ class MemosV1Repository(
                         userMap[creator]?.let { user ->
                             User(
                                 user.name,
-                                user.displayName ?: user.username,
+                                user.resolvedDisplayName(),
                                 user.createTime ?: Instant.now()
                             )
                         }
@@ -131,11 +186,14 @@ class MemosV1Repository(
         tags: List<String>?,
         createdAt: Instant?
     ): ApiResponse<Memo> {
+        val linked = resourceRemoteIds.map { MemosV1Resource(name = getName(it)) }
         val resp = memosApi.createMemo(
             MemosV1CreateMemoRequest(
                 content = content,
                 visibility = MemosVisibility.fromMemoVisibility(visibility),
-                attachments = resourceRemoteIds.map { MemosV1Resource(name = getName(it)) },
+                // Send both field names for cross-version create compatibility.
+                attachments = linked.ifEmpty { null },
+                resources = linked.ifEmpty { null },
                 createTime = createdAt
             )
         )
@@ -152,13 +210,15 @@ class MemosV1Repository(
         pinned: Boolean?,
         archived: Boolean?
     ): ApiResponse<Memo> {
+        val linked = resourceRemoteIds?.map { MemosV1Resource(name = getName(it)) }
         val resp = memosApi.updateMemo(getId(remoteId), UpdateMemoRequest(
             content = content,
             visibility = visibility?.let { MemosVisibility.fromMemoVisibility(it) },
             pinned = pinned,
             state = archived?.let { isArchived -> if (isArchived) MemosV1State.ARCHIVED else MemosV1State.NORMAL },
             updateTime = Instant.now(),
-            attachments = resourceRemoteIds?.map { MemosV1Resource(name = getName(it)) }
+            attachments = linked,
+            resources = linked,
         )).mapSuccess { convertMemo(this) }
         return resp
     }
@@ -167,8 +227,42 @@ class MemosV1Repository(
         return memosApi.deleteMemo(getId(remoteId))
     }
 
+    private suspend fun listAllLegacyResources(): ApiResponse<List<Resource>> {
+        var nextPageToken: String? = null
+        val items = arrayListOf<MemosV1Resource>()
+        do {
+            val resp = memosApi.listResourcesLegacy(pageSize = PAGE_SIZE, pageToken = nextPageToken)
+            if (resp !is ApiResponse.Success) {
+                return resp.mapSuccess { emptyList() }
+            }
+            items.addAll(resp.data.items())
+            nextPageToken = resp.data.let {
+                // ListResourceResponse has no nextPageToken field in older API when returning all;
+                // stop if empty page or no growth. Resources endpoint on 0.24 may return all at once.
+                null
+            }
+            // 0.24 often returns the full list without paging; break after first page.
+            break
+        } while (!nextPageToken.isNullOrEmpty())
+        return ApiResponse.Success(items.map { convertResource(it) })
+    }
+
     override suspend fun listResources(): ApiResponse<List<Resource>> {
-        return memosApi.listResources().mapSuccess { this.attachments.map { convertResource(it) } }
+        when (useLegacyResources) {
+            true -> return listAllLegacyResources()
+            false -> {
+                return memosApi.listAttachments().mapSuccess { items().map { convertResource(it) } }
+            }
+            null -> {
+                val attachments = memosApi.listAttachments()
+                if (attachments is ApiResponse.Success) {
+                    useLegacyResources = false
+                    return attachments.mapSuccess { items().map { convertResource(it) } }
+                }
+                useLegacyResources = true
+                return listAllLegacyResources()
+            }
+        }
     }
 
     override suspend fun createResource(
@@ -185,30 +279,57 @@ class MemosV1Repository(
             contentLength = contentLength,
             openInputStream = openInputStream
         )
-        return memosApi.createResource(requestBody).mapSuccess { convertResource(this) }
+        when (useLegacyResources) {
+            true -> return memosApi.createResourceLegacy(requestBody).mapSuccess { convertResource(this) }
+            false -> return memosApi.createAttachment(requestBody).mapSuccess { convertResource(this) }
+            null -> {
+                val modern = memosApi.createAttachment(requestBody)
+                if (modern is ApiResponse.Success) {
+                    useLegacyResources = false
+                    return modern.mapSuccess { convertResource(this) }
+                }
+                useLegacyResources = true
+                return memosApi.createResourceLegacy(requestBody).mapSuccess { convertResource(this) }
+            }
+        }
     }
 
     override suspend fun deleteResource(remoteId: String): ApiResponse<Unit> {
-        return memosApi.deleteResource(getId(remoteId))
+        val id = getId(remoteId)
+        when (useLegacyResources) {
+            true -> return memosApi.deleteResourceLegacy(id)
+            false -> return memosApi.deleteAttachment(id)
+            null -> {
+                val modern = memosApi.deleteAttachment(id)
+                if (modern is ApiResponse.Success) {
+                    useLegacyResources = false
+                    return modern
+                }
+                useLegacyResources = true
+                return memosApi.deleteResourceLegacy(id)
+            }
+        }
     }
 
     override suspend fun getCurrentUser(): ApiResponse<User> {
-        val resp = memosApi.getCurrentUser().mapSuccess {
-            if (user == null) {
-                throw MoeMemosException.notLogin
-            }
+        val resp = memosApi.resolveCurrentUser(account.info.accessToken).mapSuccess {
             User(
-                user.name,
-                user.displayName ?: user.username,
-                user.createTime ?: Instant.now(),
-                avatarUrl = user.avatarUrl
+                name,
+                resolvedDisplayName(),
+                createTime ?: Instant.now(),
+                avatarUrl = avatarUrl
             )
         }
         if (resp !is ApiResponse.Success) {
             return resp
         }
 
-        return memosApi.getUserSetting(getId(resp.data.identifier)).mapSuccess {
+        val settings = memosApi.getUserSetting(getId(resp.data.identifier))
+        if (settings !is ApiResponse.Success) {
+            // Settings endpoint is absent on ~0.24 — still succeed with defaults.
+            return resp
+        }
+        return settings.mapSuccess {
             resp.data.copy(
                 defaultVisibility = generalSetting?.memoVisibility?.toMemoVisibility() ?: MemoVisibility.PRIVATE
             )

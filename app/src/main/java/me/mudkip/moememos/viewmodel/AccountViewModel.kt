@@ -66,7 +66,9 @@ class AccountViewModel @AssistedInject constructor(
                 instanceProfile = profile
             }
             is RemoteApi.MemosV1 -> {
-                val profile = memosApi.api.getProfile().getOrNull()
+                val api = memosApi.api
+                val profile = api.getInstanceProfile().getOrNull()
+                    ?: api.getWorkspaceProfile().getOrNull()
                 instanceProfile = profile
             }
             else -> {

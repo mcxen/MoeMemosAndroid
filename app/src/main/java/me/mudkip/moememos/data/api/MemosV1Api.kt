@@ -16,6 +16,7 @@ import retrofit2.http.Query
 import java.time.Instant
 
 interface MemosV1Api {
+    /** Memos ≥0.27 */
     @GET("api/v1/auth/me")
     suspend fun getCurrentUser(): ApiResponse<GetCurrentUserResponse>
 
@@ -28,6 +29,8 @@ interface MemosV1Api {
         @Query("pageToken") pageToken: String? = null,
         @Query("state") state: MemosV1State? = null,
         @Query("filter") filter: String? = null,
+        /** Memos ~0.22–0.24: list a user's memos via parent=users/{id} */
+        @Query("parent") parent: String? = null,
     ): ApiResponse<ListMemosResponse>
 
     @POST("api/v1/memos")
@@ -39,23 +42,45 @@ interface MemosV1Api {
     @DELETE("api/v1/memos/{id}")
     suspend fun deleteMemo(@Path("id") memoId: String): ApiResponse<Unit>
 
+    /** Memos ≥0.27 renamed resources → attachments */
     @GET("api/v1/attachments")
-    suspend fun listResources(): ApiResponse<ListResourceResponse>
+    suspend fun listAttachments(): ApiResponse<ListResourceResponse>
 
     @POST("api/v1/attachments")
-    suspend fun createResource(@Body body: RequestBody): ApiResponse<MemosV1Resource>
+    suspend fun createAttachment(@Body body: RequestBody): ApiResponse<MemosV1Resource>
 
     @DELETE("api/v1/attachments/{id}")
-    suspend fun deleteResource(@Path("id") resourceId: String): ApiResponse<Unit>
+    suspend fun deleteAttachment(@Path("id") resourceId: String): ApiResponse<Unit>
 
+    /** Memos ~0.22–0.24 */
+    @GET("api/v1/resources")
+    suspend fun listResourcesLegacy(
+        @Query("pageSize") pageSize: Int? = null,
+        @Query("pageToken") pageToken: String? = null,
+    ): ApiResponse<ListResourceResponse>
+
+    @POST("api/v1/resources")
+    suspend fun createResourceLegacy(@Body body: RequestBody): ApiResponse<MemosV1Resource>
+
+    @DELETE("api/v1/resources/{id}")
+    suspend fun deleteResourceLegacy(@Path("id") resourceId: String): ApiResponse<Unit>
+
+    /** Memos ≥0.27 */
     @GET("api/v1/instance/profile")
-    suspend fun getProfile(): ApiResponse<MemosProfile>
+    suspend fun getInstanceProfile(): ApiResponse<MemosProfile>
+
+    /** Memos ~0.22–0.24 */
+    @GET("api/v1/workspace/profile")
+    suspend fun getWorkspaceProfile(): ApiResponse<MemosProfile>
 
     @GET("api/v1/users/{id}")
     suspend fun getUser(@Path("id") userId: String): ApiResponse<MemosV1User>
 
     @GET("api/v1/users/{id}:getStats")
     suspend fun getUserStats(@Path("id") userId: String): ApiResponse<MemosV1Stats>
+
+    @GET("api/v1/users/{id}/stats")
+    suspend fun getUserStatsLegacy(@Path("id") userId: String): ApiResponse<MemosV1Stats>
 }
 
 @Serializable
@@ -64,7 +89,10 @@ data class MemosV1User(
     val role: MemosRole = MemosRole.ROLE_UNSPECIFIED,
     val username: String,
     val email: String? = null,
+    /** Memos ≥0.27 */
     val displayName: String? = null,
+    /** Memos ~0.22–0.24 */
+    val nickname: String? = null,
     val avatarUrl: String? = null,
     val description: String? = null,
     val state: MemosV1State = MemosV1State.STATE_UNSPECIFIED,
@@ -72,7 +100,11 @@ data class MemosV1User(
     val createTime: Instant? = null,
     @Serializable(with = Rfc3339InstantSerializer::class)
     val updateTime: Instant? = null
-)
+) {
+    fun resolvedDisplayName(): String = displayName?.takeIf { it.isNotBlank() }
+        ?: nickname?.takeIf { it.isNotBlank() }
+        ?: username
+}
 
 @Serializable
 data class GetCurrentUserResponse(
@@ -83,7 +115,10 @@ data class GetCurrentUserResponse(
 data class MemosV1CreateMemoRequest(
     val content: String,
     val visibility: MemosVisibility?,
-    val attachments: List<MemosV1Resource>?,
+    /** Memos ≥0.27 */
+    val attachments: List<MemosV1Resource>? = null,
+    /** Memos ~0.22–0.24 */
+    val resources: List<MemosV1Resource>? = null,
     @Serializable(with = Rfc3339InstantSerializer::class)
     val createTime: Instant? = null
 )
@@ -102,13 +137,17 @@ data class UpdateMemoRequest(
     val pinned: Boolean? = null,
     @Serializable(with = Rfc3339InstantSerializer::class)
     val updateTime: Instant? = null,
-    val attachments: List<MemosV1Resource>? = null
+    val attachments: List<MemosV1Resource>? = null,
+    val resources: List<MemosV1Resource>? = null
 )
 
 @Serializable
 data class ListResourceResponse(
-    val attachments: List<MemosV1Resource>
-)
+    val attachments: List<MemosV1Resource>? = null,
+    val resources: List<MemosV1Resource>? = null,
+) {
+    fun items(): List<MemosV1Resource> = attachments ?: resources ?: emptyList()
+}
 
 @Serializable
 data class CreateResourceRequest(
@@ -130,9 +169,14 @@ data class MemosV1Memo(
     val content: String? = null,
     val visibility: MemosVisibility? = null,
     val pinned: Boolean? = null,
+    /** Memos ≥0.27 */
     val attachments: List<MemosV1Resource>? = null,
+    /** Memos ~0.22–0.24 */
+    val resources: List<MemosV1Resource>? = null,
     val tags: List<String>? = null
-)
+) {
+    fun resourceList(): List<MemosV1Resource> = attachments ?: resources ?: emptyList()
+}
 
 @Serializable
 data class MemosV1Resource(
@@ -178,5 +222,5 @@ enum class MemosV1State {
 
 @Serializable
 data class MemosV1Stats(
-    val tagCount: Map<String, Int>,
+    val tagCount: Map<String, Int> = emptyMap(),
 )

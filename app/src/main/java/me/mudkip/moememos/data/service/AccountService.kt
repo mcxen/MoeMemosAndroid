@@ -499,7 +499,10 @@ class AccountService @Inject constructor(
             return ServerVersionInfo(UserData.AccountCase.MEMOS_V0, memosV0Version)
         }
 
-        val memosV1Profile = createMemosV1Client(host, null).second.getProfile().getOrThrow()
+        val memosV1Api = createMemosV1Client(host, null).second
+        // ≥0.27: /api/v1/instance/profile ; ~0.22–0.24: /api/v1/workspace/profile
+        val memosV1Profile = memosV1Api.getInstanceProfile().getOrNull()
+            ?: memosV1Api.getWorkspaceProfile().getOrThrow()
         val memosV1Version = memosV1Profile.version.trim()
         if (memosV1Version.isNotEmpty()) {
             return ServerVersionInfo(UserData.AccountCase.MEMOS_V1, memosV1Version)
@@ -522,10 +525,11 @@ class AccountService @Inject constructor(
                 if (version.isBlank()) null else ServerVersionInfo(UserData.AccountCase.MEMOS_V0, version)
             }
             is Account.MemosV1 -> {
-                val version = createMemosV1Client(account.info.host, account.info.accessToken)
-                    .second
-                    .getProfile()
-                    .getOrNull()
+                val api = createMemosV1Client(account.info.host, account.info.accessToken).second
+                val version = (
+                    api.getInstanceProfile().getOrNull()
+                        ?: api.getWorkspaceProfile().getOrNull()
+                    )
                     ?.version
                     ?.trim()
                     .orEmpty()
