@@ -606,6 +606,8 @@ class SyncingRepository(
                 )
                 true
             } else {
+                val msg = updated.getErrorMessage().ifBlank { "Failed to update memo on server" }
+                pendingDetailedSyncError = msg
                 false
             }
         } else {
@@ -617,6 +619,8 @@ class SyncingRepository(
                 createdAt = local.date
             )
             if (created !is ApiResponse.Success) {
+                val msg = created.getErrorMessage().ifBlank { "Failed to create memo on server" }
+                pendingDetailedSyncError = msg
                 return false
             }
 

@@ -179,6 +179,40 @@ class MemosV1Repository(
             } to this.nextPageToken?.ifEmpty { null } }
     }
 
+    /**
+     * Memos ~0.22–0.24 rejects unknown field `attachments` on PATCH (even when empty).
+     * Memos ≥0.27 uses `attachments` and may reject `resources`.
+     * Never send both; pick the dialect (or probe once).
+     *
+     * @param linked null = omit resource fields; empty = clear resources; non-empty = set.
+     */
+    private data class ResourceLinkFields(
+        val attachments: List<MemosV1Resource>? = null,
+        val resources: List<MemosV1Resource>? = null,
+    )
+
+    private fun linkFieldsForDialect(
+        linked: List<MemosV1Resource>?,
+        legacyResources: Boolean,
+    ): ResourceLinkFields {
+        if (linked == null) {
+            return ResourceLinkFields()
+        }
+        return if (legacyResources) {
+            ResourceLinkFields(resources = linked)
+        } else {
+            ResourceLinkFields(attachments = linked)
+        }
+    }
+
+    private suspend fun detectLegacyResourceField(): Boolean {
+        useLegacyResources?.let { return it }
+        val attachments = memosApi.listAttachments()
+        val legacy = attachments !is ApiResponse.Success
+        useLegacyResources = legacy
+        return legacy
+    }
+
     override suspend fun createMemo(
         content: String,
         visibility: MemoVisibility,
@@ -187,18 +221,34 @@ class MemosV1Repository(
         createdAt: Instant?
     ): ApiResponse<Memo> {
         val linked = resourceRemoteIds.map { MemosV1Resource(name = getName(it)) }
-        val resp = memosApi.createMemo(
+        val legacy = detectLegacyResourceField()
+        val fields = linkFieldsForDialect(linked, legacy)
+        val primary = memosApi.createMemo(
             MemosV1CreateMemoRequest(
                 content = content,
                 visibility = MemosVisibility.fromMemoVisibility(visibility),
-                // Send both field names for cross-version create compatibility.
-                attachments = linked.ifEmpty { null },
-                resources = linked.ifEmpty { null },
+                attachments = fields.attachments,
+                resources = fields.resources,
                 createTime = createdAt
             )
-        )
-            .mapSuccess { convertMemo(this) }
-        return resp
+        ).mapSuccess { convertMemo(this) }
+        if (primary is ApiResponse.Success || linked.isEmpty()) {
+            return primary
+        }
+        val alt = linkFieldsForDialect(linked, legacyResources = !legacy)
+        val secondary = memosApi.createMemo(
+            MemosV1CreateMemoRequest(
+                content = content,
+                visibility = MemosVisibility.fromMemoVisibility(visibility),
+                attachments = alt.attachments,
+                resources = alt.resources,
+                createTime = createdAt
+            )
+        ).mapSuccess { convertMemo(this) }
+        if (secondary is ApiResponse.Success) {
+            useLegacyResources = !legacy
+        }
+        return secondary
     }
 
     override suspend fun updateMemo(
@@ -210,17 +260,37 @@ class MemosV1Repository(
         pinned: Boolean?,
         archived: Boolean?
     ): ApiResponse<Memo> {
+        // null = leave resources unchanged; non-null (incl. empty) = replace link set
         val linked = resourceRemoteIds?.map { MemosV1Resource(name = getName(it)) }
-        val resp = memosApi.updateMemo(getId(remoteId), UpdateMemoRequest(
+        val legacy = detectLegacyResourceField()
+        val fields = linkFieldsForDialect(linked, legacy)
+        val memoId = getId(remoteId)
+
+        fun buildRequest(link: ResourceLinkFields) = UpdateMemoRequest(
             content = content,
             visibility = visibility?.let { MemosVisibility.fromMemoVisibility(it) },
             pinned = pinned,
             state = archived?.let { isArchived -> if (isArchived) MemosV1State.ARCHIVED else MemosV1State.NORMAL },
             updateTime = Instant.now(),
-            attachments = linked,
-            resources = linked,
-        )).mapSuccess { convertMemo(this) }
-        return resp
+            attachments = link.attachments,
+            resources = link.resources,
+        )
+
+        val primary = memosApi.updateMemo(memoId, buildRequest(fields)).mapSuccess { convertMemo(this) }
+        if (primary is ApiResponse.Success) {
+            return primary
+        }
+
+        // Dialect mismatch fallback when a resource field was present.
+        if (linked != null) {
+            val alt = linkFieldsForDialect(linked, legacyResources = !legacy)
+            val secondary = memosApi.updateMemo(memoId, buildRequest(alt)).mapSuccess { convertMemo(this) }
+            if (secondary is ApiResponse.Success) {
+                useLegacyResources = !legacy
+            }
+            return secondary
+        }
+        return primary
     }
 
     override suspend fun deleteMemo(remoteId: String): ApiResponse<Unit> {
