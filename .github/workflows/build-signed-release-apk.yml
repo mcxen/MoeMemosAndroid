@@ -1,13 +1,13 @@
 name: Build Signed Release APK
 
 # Automatic release when you push a version tag, e.g.:
-#   git tag 2.0.5 && git push origin 2.0.5
+#   git tag 2.0.7 && git push origin 2.0.7
+# Tag filters are globs (not regex): "+" is a literal character.
 # Or run manually from Actions → "Build Signed Release APK" → Run workflow.
 on:
   push:
     tags:
-      - "[0-9]+.[0-9]+.[0-9]+"
-      - "[0-9]+.[0-9]+.[0-9]+-*"
+      - "[0-9]*.[0-9]*.[0-9]*"
   workflow_dispatch:
     inputs:
       version:

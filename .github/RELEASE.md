@@ -4,14 +4,14 @@
 
 1. 改 `app/build.gradle` 里的 `versionName` / `versionCode`
 2. 提交并推送到 `main`
-3. 打 tag 并推送（会触发 Actions 构建并创建 Release）：
+3. 打 tag 并推送，Actions 会自动构建签名 APK 并创建 Release：
 
 ```bash
-git tag 2.0.5
-git push origin 2.0.5
+git tag 2.0.7
+git push origin 2.0.7
 ```
 
-或在 GitHub：**Actions → Build Signed Release APK → Run workflow**，输入版本号。
+需要补发或重发时，可在 GitHub：**Actions → Build Signed Release APK → Run workflow**，输入版本号。
 
 ## 安装包在哪里
 
@@ -39,6 +39,8 @@ git push origin 2.0.5
 
 ## 支持的 tag 格式
 
-- `2.0.5`
-- `2.0.5-alpha.0`
-- `2.0.5-beta.0`
+推送这些格式的 tag 会自动发版：
+
+- `2.0.7`
+- `2.0.7-alpha.0`
+- `2.0.7-beta.0`
