@@ -104,6 +104,10 @@
     <string name="edit_gesture_single">Single tap</string>
     <string name="edit_gesture_double">Double tap</string>
     <string name="edit_gesture_long">Long tap</string>
+    <string name="home_layout">Home layout</string>
+    <string name="home_layout_summary">Switch between a single-column list and a Keep-style card grid.</string>
+    <string name="home_layout_list">List</string>
+    <string name="home_layout_cards">Cards</string>
     <string name="failed_to_open_attachment">Failed to open attachment</string>
     <string name="export_local_account">Export Local Data</string>
     <string name="local_export_success">Local data exported</string>

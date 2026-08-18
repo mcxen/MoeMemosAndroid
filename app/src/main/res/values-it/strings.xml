@@ -89,6 +89,10 @@
     <string name="edit_gesture_single">Tocco singolo</string>
     <string name="edit_gesture_double">Doppio tocco</string>
     <string name="edit_gesture_long">Tocco prolungato</string>
+    <string name="home_layout">Layout home</string>
+    <string name="home_layout_summary">Passa da un elenco a colonna singola a una griglia di schede.</string>
+    <string name="home_layout_list">Elenco</string>
+    <string name="home_layout_cards">Schede</string>
     <string name="account_detail">Dettaglio account</string>
     <string name="switch_account">Cambia account</string>
     <string name="local_account">Account locale</string>

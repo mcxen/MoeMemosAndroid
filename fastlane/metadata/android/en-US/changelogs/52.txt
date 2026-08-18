@@ -1,0 +1,3 @@
+## What's Changed
+* Added a Keep-style card layout for the memo list, switchable in Settings.
+* Card images now size themselves from their real aspect ratio.

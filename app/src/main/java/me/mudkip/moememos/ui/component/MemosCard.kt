@@ -24,9 +24,11 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.PinDrop
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -68,14 +70,19 @@ fun MemosCard(
     editGesture: MemoEditGesture = MemoEditGesture.NONE,
     previewMode: Boolean = false,
     showSyncStatus: Boolean = false,
-    onTagClick: ((String) -> Unit)? = null
+    onTagClick: ((String) -> Unit)? = null,
+    compact: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val memosViewModel = LocalMemos.current
     val rootNavController = LocalRootNavController.current
     val scope = rememberCoroutineScope()
 
-    val cardModifier = Modifier
-        .padding(horizontal = 15.dp, vertical = 10.dp)
+    val cardModifier = modifier
+        .padding(
+            horizontal = if (compact) 0.dp else 15.dp,
+            vertical = if (compact) 0.dp else 10.dp
+        )
         .fillMaxWidth()
         .combinedClickable(
             onClick = {
@@ -103,6 +110,19 @@ fun MemosCard(
 
     Card(
         modifier = cardModifier,
+        shape = if (compact) RoundedCornerShape(16.dp) else CardDefaults.shape,
+        colors = if (compact) {
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            )
+        } else {
+            CardDefaults.cardColors()
+        },
+        elevation = if (compact) {
+            CardDefaults.cardElevation(defaultElevation = 1.dp)
+        } else {
+            CardDefaults.cardElevation()
+        },
         border = if (memo.pinned) {
             BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
         } else {
@@ -112,7 +132,7 @@ fun MemosCard(
         Column {
             Row(
                 modifier = Modifier
-                    .padding(start = 15.dp)
+                    .padding(start = if (compact) 10.dp else 15.dp)
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -122,7 +142,11 @@ fun MemosCard(
                         System.currentTimeMillis(),
                         DateUtils.SECOND_IN_MILLIS
                     ).toString(),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = if (compact) {
+                        MaterialTheme.typography.labelMedium
+                    } else {
+                        MaterialTheme.typography.labelLarge
+                    },
                     color = MaterialTheme.colorScheme.outline
                 )
                 if (showSyncStatus && memo.needsSync) {
@@ -131,7 +155,7 @@ fun MemosCard(
                         contentDescription = R.string.memo_sync_pending.string,
                         modifier = Modifier
                             .padding(start = 5.dp)
-                            .size(20.dp),
+                            .size(if (compact) 16.dp else 20.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -141,17 +165,18 @@ fun MemosCard(
                         contentDescription = stringResource(memo.visibility.titleResource),
                         modifier = Modifier
                             .padding(start = 5.dp)
-                            .size(20.dp),
+                            .size(if (compact) 16.dp else 20.dp),
                         tint = MaterialTheme.colorScheme.outline
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                MemosCardActionButton(memo)
+                MemosCardActionButton(memo, compact = compact)
             }
 
             MemoContent(
                 memo,
                 previewMode = previewMode,
+                compact = compact,
                 checkboxChange = { checked, startOffset, endOffset ->
                     scope.launch {
                         var text = memo.content.substring(startOffset, endOffset)
@@ -180,6 +205,7 @@ fun MemosCard(
 @Composable
 fun MemosCardActionButton(
     memo: MemoEntity,
+    compact: Boolean = false,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -193,8 +219,15 @@ fun MemosCardActionButton(
     val memoLabel = stringResource(R.string.memo)
 
     Box {
-        IconButton(onClick = { menuExpanded = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = null)
+        IconButton(
+            onClick = { menuExpanded = true },
+            modifier = if (compact) Modifier.size(36.dp) else Modifier
+        ) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = null,
+                modifier = if (compact) Modifier.size(18.dp) else Modifier
+            )
         }
         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
             if (memo.pinned) {

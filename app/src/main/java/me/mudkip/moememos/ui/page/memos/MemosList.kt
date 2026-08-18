@@ -1,6 +1,7 @@
 package me.mudkip.moememos.ui.page.memos
 
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredGridItems
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -30,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.model.Account
+import me.mudkip.moememos.data.model.HomeLayout
 import me.mudkip.moememos.data.model.MemoEditGesture
 import me.mudkip.moememos.data.model.Settings
 import me.mudkip.moememos.ext.settingsDataStore
@@ -48,6 +55,7 @@ import timber.log.Timber
 fun MemosList(
     contentPadding: PaddingValues,
     lazyListState: LazyListState = rememberLazyListState(),
+    lazyGridState: LazyStaggeredGridState = rememberLazyStaggeredGridState(),
     tag: String? = null,
     searchString: String? = null,
     additionalBottomPadding: Dp = 16.dp,
@@ -60,6 +68,7 @@ fun MemosList(
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
     val settings by context.settingsDataStore.data.collectAsState(initial = Settings())
+    val homeLayout = settings.homeLayout
     val editGesture = settings.usersList
         .firstOrNull { it.accountKey == settings.currentUser }
         ?.settings
@@ -125,26 +134,62 @@ fun MemosList(
         state = refreshState,
         modifier = Modifier.fillMaxSize()
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .consumeWindowInsets(contentPadding),
-            state = lazyListState,
-            contentPadding = listContentPadding
-        ) {
-            items(filteredMemos, key = { it.identifier }) { memo ->
-                MemosCard(
-                    memo = memo,
-                    onClick = { selectedMemo ->
-                        navController.navigate(
-                            "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.identifier)}"
-                        )
-                    },
-                    editGesture = editGesture ?: MemoEditGesture.NONE,
-                    previewMode = true,
-                    showSyncStatus = currentAccount !is Account.Local,
-                    onTagClick = onTagClick
-                )
+        if (homeLayout == HomeLayout.CARDS) {
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Adaptive(minSize = 168.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeWindowInsets(contentPadding),
+                state = lazyGridState,
+                contentPadding = PaddingValues(
+                    start = listContentPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) + 8.dp,
+                    top = listContentPadding.calculateTopPadding() + 4.dp,
+                    end = listContentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr) + 8.dp,
+                    bottom = listContentPadding.calculateBottomPadding() + 4.dp
+                ),
+                verticalItemSpacing = 8.dp,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                staggeredGridItems(filteredMemos, key = { it.identifier }) { memo ->
+                    MemosCard(
+                        memo = memo,
+                        onClick = { selectedMemo ->
+                            navController.navigate(
+                                "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.identifier)}"
+                            )
+                        },
+                        editGesture = editGesture ?: MemoEditGesture.NONE,
+                        previewMode = true,
+                        showSyncStatus = currentAccount !is Account.Local,
+                        onTagClick = onTagClick,
+                        compact = true,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .consumeWindowInsets(contentPadding),
+                state = lazyListState,
+                contentPadding = listContentPadding
+            ) {
+                items(filteredMemos, key = { it.identifier }) { memo ->
+                    MemosCard(
+                        memo = memo,
+                        onClick = { selectedMemo ->
+                            navController.navigate(
+                                "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.identifier)}"
+                            )
+                        },
+                        editGesture = editGesture ?: MemoEditGesture.NONE,
+                        previewMode = true,
+                        showSyncStatus = currentAccount !is Account.Local,
+                        onTagClick = onTagClick,
+                        modifier = Modifier.animateItem()
+                    )
+                }
             }
         }
     }
@@ -159,9 +204,13 @@ fun MemosList(
         viewModel.loadMemos()
     }
 
-    LaunchedEffect(filteredMemos.firstOrNull()?.identifier) {
+    LaunchedEffect(filteredMemos.firstOrNull()?.identifier, homeLayout) {
         if (listTopId != null && filteredMemos.isNotEmpty() && listTopId != filteredMemos.first().identifier) {
-            lazyListState.scrollToItem(0)
+            if (homeLayout == HomeLayout.CARDS) {
+                lazyGridState.scrollToItem(0)
+            } else {
+                lazyListState.scrollToItem(0)
+            }
         }
 
         listTopId = filteredMemos.firstOrNull()?.identifier

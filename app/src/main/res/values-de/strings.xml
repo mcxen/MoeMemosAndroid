@@ -83,6 +83,10 @@
     <string name="edit_gesture_single">Einmal tippen</string>
     <string name="edit_gesture_double">Doppelt tippen</string>
     <string name="edit_gesture_long">Langes Tippen</string>
+    <string name="home_layout">Startseitenlayout</string>
+    <string name="home_layout_summary">Zwischen einspaltiger Liste und Kartenraster wechseln.</string>
+    <string name="home_layout_list">Liste</string>
+    <string name="home_layout_cards">Karten</string>
     <string name="account_detail">Kontodetail</string>
     <string name="switch_account">Konto wechseln</string>
     <string name="local_account">Lokales Konto</string>

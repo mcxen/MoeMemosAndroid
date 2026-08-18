@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Lock
@@ -42,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.model.Account
+import me.mudkip.moememos.data.model.HomeLayout
 import me.mudkip.moememos.data.model.MemoEditGesture
 import me.mudkip.moememos.data.model.Settings
 import me.mudkip.moememos.data.model.displayTitle
@@ -72,6 +74,7 @@ fun SettingsPage(
         AppLockAuthenticator.canAuthenticate(context)
     }
     var showEditGestureDialog by remember { mutableStateOf(false) }
+    var showHomeLayoutDialog by remember { mutableStateOf(false) }
 
     fun setAppLockEnabled(enabled: Boolean) {
         if (enabled && !appLockSupported) {
@@ -206,6 +209,22 @@ fun SettingsPage(
             }
 
             item {
+                SettingItem(
+                    icon = Icons.Outlined.Dashboard,
+                    text = R.string.home_layout.string,
+                    subtitle = R.string.home_layout_summary.string,
+                    trailingIcon = {
+                        Text(
+                            text = settings.homeLayout.titleResource.string,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                ) {
+                    showHomeLayoutDialog = true
+                }
+            }
+
+            item {
                 Text(
                     R.string.security.string,
                     modifier = Modifier
@@ -276,6 +295,46 @@ fun SettingsPage(
         }
     }
 
+    if (showHomeLayoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showHomeLayoutDialog = false },
+            title = { Text(R.string.home_layout.string) },
+            text = {
+                LazyColumn {
+                    items(HomeLayout.entries.size) { index ->
+                        val layout = HomeLayout.entries[index]
+                        TextButton(
+                            onClick = {
+                                showHomeLayoutDialog = false
+                                scope.launch(Dispatchers.IO) {
+                                    context.settingsDataStore.updateData { existingSettings ->
+                                        existingSettings.copy(homeLayout = layout)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = layout.titleResource.string,
+                                color = if (layout == settings.homeLayout) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHomeLayoutDialog = false }) {
+                    Text(R.string.close.string)
+                }
+            }
+        )
+    }
+
     if (showEditGestureDialog) {
         AlertDialog(
             onDismissRequest = { showEditGestureDialog = false },
@@ -334,4 +393,10 @@ private val MemoEditGesture.titleResource: Int
         MemoEditGesture.SINGLE -> R.string.edit_gesture_single
         MemoEditGesture.DOUBLE -> R.string.edit_gesture_double
         MemoEditGesture.LONG -> R.string.edit_gesture_long
+    }
+
+private val HomeLayout.titleResource: Int
+    get() = when (this) {
+        HomeLayout.LIST -> R.string.home_layout_list
+        HomeLayout.CARDS -> R.string.home_layout_cards
     }

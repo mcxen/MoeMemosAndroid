@@ -88,6 +88,10 @@
     <string name="edit_gesture_single">Одно нажатие</string>
     <string name="edit_gesture_double">Двойное нажатие</string>
     <string name="edit_gesture_long">Долгое нажатие</string>
+    <string name="home_layout">Макет главной</string>
+    <string name="home_layout_summary">Переключение между одноколоночным списком и сеткой карточек.</string>
+    <string name="home_layout_list">Список</string>
+    <string name="home_layout_cards">Карточки</string>
     <string name="account_detail">Сведения об аккаунте</string>
     <string name="switch_account">Сменить аккаунт</string>
     <string name="local_account">Локальный аккаунт</string>

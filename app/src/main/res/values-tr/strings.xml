@@ -89,6 +89,10 @@
     <string name="edit_gesture_single">Tek dokunuş</string>
     <string name="edit_gesture_double">Çift dokunuş</string>
     <string name="edit_gesture_long">Uzun dokunuş</string>
+    <string name="home_layout">Ana sayfa düzeni</string>
+    <string name="home_layout_summary">Tek sütunlu liste ile kart ızgarası arasında geçiş yapın.</string>
+    <string name="home_layout_list">Liste</string>
+    <string name="home_layout_cards">Kartlar</string>
     <string name="account_detail">Hesap ayrıntıları</string>
     <string name="switch_account">Hesap değiştir</string>
     <string name="local_account">Yerel hesap</string>

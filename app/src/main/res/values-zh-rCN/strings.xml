@@ -86,6 +86,10 @@
     <string name="edit_gesture_single">单击</string>
     <string name="edit_gesture_double">双击</string>
     <string name="edit_gesture_long">长按</string>
+    <string name="home_layout">首页布局</string>
+    <string name="home_layout_summary">在单列列表和双列卡片流之间切换。</string>
+    <string name="home_layout_list">普通列表</string>
+    <string name="home_layout_cards">卡片流</string>
     <string name="account_detail">账户详情</string>
     <string name="switch_account">切换账户</string>
     <string name="local_account">本地账户</string>

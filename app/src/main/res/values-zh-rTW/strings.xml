@@ -84,6 +84,10 @@
     <string name="edit_gesture_single">單擊</string>
     <string name="edit_gesture_double">雙擊</string>
     <string name="edit_gesture_long">長按</string>
+    <string name="home_layout">首頁版面</string>
+    <string name="home_layout_summary">在單列列表與雙列卡片流之間切換。</string>
+    <string name="home_layout_list">一般列表</string>
+    <string name="home_layout_cards">卡片流</string>
     <string name="account_detail">帳戶詳情</string>
     <string name="switch_account">切換帳戶</string>
     <string name="local_account">本地帳戶</string>

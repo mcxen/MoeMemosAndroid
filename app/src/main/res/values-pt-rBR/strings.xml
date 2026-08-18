@@ -101,6 +101,10 @@
     <string name="edit_gesture_single">Toque único</string>
     <string name="edit_gesture_double">Toque duplo</string>
     <string name="edit_gesture_long">Toque longo</string>
+    <string name="home_layout">Layout inicial</string>
+    <string name="home_layout_summary">Alterne entre uma lista em coluna única e uma grade de cartões.</string>
+    <string name="home_layout_list">Lista</string>
+    <string name="home_layout_cards">Cartões</string>
     <string name="failed_to_open_attachment">Falha ao abrir anexo</string>
     <string name="export_local_account">Exportar Dados Locais</string>
     <string name="local_export_success">Dados locais exportados</string>

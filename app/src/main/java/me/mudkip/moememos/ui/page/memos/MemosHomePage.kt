@@ -2,6 +2,7 @@ package me.mudkip.moememos.ui.page.memos
 
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
@@ -26,10 +27,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.model.Account
+import me.mudkip.moememos.data.model.HomeLayout
+import me.mudkip.moememos.data.model.Settings
+import me.mudkip.moememos.ext.settingsDataStore
 import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ui.component.SyncStatusBadge
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
@@ -46,16 +51,23 @@ fun MemosHomePage(
     navController: NavHostController
 ) {
     val listState = rememberLazyListState()
+    val gridState = rememberLazyStaggeredGridState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val rootNavController = LocalRootNavController.current
     val memosViewModel = LocalMemos.current
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
     val syncStatus by memosViewModel.syncStatus.collectAsState()
+    val settings by context.settingsDataStore.data.collectAsState(initial = Settings())
 
     val expandedFab by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0
+            if (settings.homeLayout == HomeLayout.CARDS) {
+                gridState.firstVisibleItemIndex == 0
+            } else {
+                listState.firstVisibleItemIndex == 0
+            }
         }
     }
     var syncAlert by remember { mutableStateOf<HomeSyncAlert?>(null) }
@@ -123,6 +135,7 @@ fun MemosHomePage(
         content = { innerPadding ->
             MemosList(
                 lazyListState = listState,
+                lazyGridState = gridState,
                 contentPadding = innerPadding,
                 additionalBottomPadding = MemoListFabAvoidancePadding,
                 onRefresh = { requestManualSync() },

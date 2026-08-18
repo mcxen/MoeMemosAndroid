@@ -3,8 +3,10 @@ package me.mudkip.moememos.ui.component
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,8 +33,13 @@ fun MemoImage(
     modifier: Modifier = Modifier,
     resourceIdentifier: String? = null,
     onClick: (() -> Unit)? = null,
+    contentScale: ContentScale = ContentScale.Crop,
+    matchIntrinsicAspectRatio: Boolean = false,
+    minAspectRatio: Float = 0.62f,
+    maxAspectRatio: Float = 1.9f,
 ) {
-    var diskCacheFile: File? by remember { mutableStateOf(null) }
+    var diskCacheFile: File? by remember(url) { mutableStateOf(null) }
+    var aspectRatio by remember(url) { mutableFloatStateOf(4f / 3f) }
     val context = LocalContext.current
     val userStateViewModel = LocalUserState.current
     val memosViewModel = LocalMemos.current
@@ -53,7 +60,15 @@ fun MemoImage(
         modelUri.takeIf { it.scheme == "file" }?.path?.let(::File)
     }
 
-    val imageModifier = modifier.clickable {
+    val imageModifier = modifier
+        .then(
+            if (matchIntrinsicAspectRatio) {
+                Modifier.aspectRatio(aspectRatio)
+            } else {
+                Modifier
+            }
+        )
+        .clickable {
         if (onClick != null) {
             onClick()
             return@clickable
@@ -86,8 +101,15 @@ fun MemoImage(
         imageLoader = imageLoader,
         contentDescription = null,
         modifier = imageModifier,
-        contentScale = ContentScale.Crop,
+        contentScale = contentScale,
         onSuccess = { state ->
+            if (matchIntrinsicAspectRatio) {
+                val image = state.result.image
+                if (image.width > 0 && image.height > 0) {
+                    aspectRatio = (image.width.toFloat() / image.height.toFloat())
+                        .coerceIn(minAspectRatio, maxAspectRatio)
+                }
+            }
             val diskCache = imageLoader.diskCache
             val diskCacheKey = state.result.diskCacheKey
 

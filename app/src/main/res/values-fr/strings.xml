@@ -89,6 +89,10 @@
     <string name="edit_gesture_single">Appui simple</string>
     <string name="edit_gesture_double">Double appui</string>
     <string name="edit_gesture_long">Appui long</string>
+    <string name="home_layout">Disposition d\'accueil</string>
+    <string name="home_layout_summary">Basculer entre une liste à une colonne et une grille de cartes.</string>
+    <string name="home_layout_list">Liste</string>
+    <string name="home_layout_cards">Cartes</string>
     <string name="account_detail">Détails du compte</string>
     <string name="switch_account">Changer de compte</string>
     <string name="local_account">Compte local</string>
