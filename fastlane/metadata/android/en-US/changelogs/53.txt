@@ -1,0 +1,2 @@
+## What's Changed
+* Fixed synchronization failures in release builds caused by optimized Retrofit response type metadata.
