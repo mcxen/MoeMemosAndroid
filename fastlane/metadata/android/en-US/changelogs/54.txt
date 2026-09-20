@@ -1,0 +1,2 @@
+## What's Changed
+* Fixed synchronization, attachments, and account statistics in optimized release builds.

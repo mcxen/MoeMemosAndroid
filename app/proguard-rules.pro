@@ -31,11 +31,10 @@
 -keepattributes AnnotationDefault
 
 # Retrofit resolves suspend response types from the Continuation generic signature at runtime.
-# R8 full mode can rewrite that signature to Object when the service and Sandwich wrapper are
-# only referenced through Retrofit's dynamic proxy, which makes kotlinx.serialization try to
-# create a converter for java.lang.Object. Keep this small reflective boundary intact.
--keep interface me.mudkip.moememos.data.api.MemosV0Api { *; }
--keep interface me.mudkip.moememos.data.api.MemosV1Api { *; }
+# R8 full mode can rewrite response DTOs that are only reached through that signature to Object,
+# which makes kotlinx.serialization try to create a converter for java.lang.Object. Keep the
+# complete API reflection boundary intact, including service interfaces and serialized DTOs.
+-keep class me.mudkip.moememos.data.api.** { *; }
 -keep interface com.skydoves.sandwich.ApiResponse { *; }
 
 # Retain service method parameters when optimizing.
